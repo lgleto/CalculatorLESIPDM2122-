@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
+import androidx.core.text.isDigitsOnly
 
 enum class Operator {
     add,
@@ -17,9 +18,7 @@ class MainActivity : AppCompatActivity() , View.OnClickListener {
 
     lateinit var textViewDisplay : TextView
 
-    var userIsInTheMiddelOfIntroduction = false
-    var operator : Operator? = null
-    var operand = 0.0
+    var itemCalcs : MutableList<ItemCalc> = arrayListOf()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,9 +47,6 @@ class MainActivity : AppCompatActivity() , View.OnClickListener {
 
         findViewById<Button>(R.id.buttonAC).setOnClickListener {
             textViewDisplay.text = "0"
-            userIsInTheMiddelOfIntroduction = false
-            operator = null
-            operand = 0.0
         }
 
         button1.setOnClickListener(this)
@@ -64,84 +60,79 @@ class MainActivity : AppCompatActivity() , View.OnClickListener {
         button9.setOnClickListener(this)
         button0.setOnClickListener(this)
         buttonDot.setOnClickListener(this)
-        buttonPlus    .setOnClickListener(onClickOperation)
-        buttonMinus   .setOnClickListener(onClickOperation)
-        buttonMultiply.setOnClickListener(onClickOperation)
-        buttonDivide  .setOnClickListener(onClickOperation)
+        buttonPlus    .setOnClickListener(this)
+        buttonMinus   .setOnClickListener(this)
+        buttonMultiply.setOnClickListener(this)
+        buttonDivide  .setOnClickListener(this)
         buttonEqual   .setOnClickListener {
-            doOperation()
+            //doOperation()
         }
     }
 
-    fun doOperation(){
-        var doneOperation = true
-        when (operator){
-            Operator.add ->{
-                operand = operand + textViewDisplay.text.toString().toDouble()
-            }
-            Operator.subtract ->{
-                operand = operand - textViewDisplay.text.toString().toDouble()
-            }
-            Operator.divide ->{
-                operand = operand / textViewDisplay.text.toString().toDouble()
-            }
-            Operator.multiply ->{
-                operand = operand * textViewDisplay.text.toString().toDouble()
-            }
-            else -> {
-                doneOperation = false
-            }
-        }
-        if (doneOperation){
-            if ((operand.rem(1)) == 0.0){
-                textViewDisplay.text = "${operand.toInt()}"
-            }else{
-                textViewDisplay.text = "$operand"
-            }
-        }
 
-
-
-    }
-
-    val onClickOperation = object : View.OnClickListener{
-        override fun onClick(view: View?) {
-            doOperation()
-            userIsInTheMiddelOfIntroduction = false
-            operand = textViewDisplay.text.toString().toDouble()
-            val buttonPressed = view as Button
-            operator = when (buttonPressed.text){
-                "+" ->  Operator.add
-                "-" ->  Operator.subtract
-                "*" ->  Operator.multiply
-                "/" ->  Operator.divide
-                else -> null
-            }
-
-        }
-
-    }
 
     override fun onClick(view: View?) {
         val buttonPressed = view as Button
 
-        if (userIsInTheMiddelOfIntroduction){
-            if (buttonPressed.text.equals(".")){
-                if (!textViewDisplay.text.contains(".")){
-                    textViewDisplay.text = "${textViewDisplay.text}${buttonPressed.text}"
+        val textPressed = buttonPressed.text.toString()
+        if (textPressed.isDigitsOnly()){
+            itemCalcs.lastOrNull()?.let{
+                if (it is ItemNumber){
+                    val newValue  = "${it.valueNumber}${textPressed}"
+                    it.valueNumber = newValue.toInt()
                 }
-            }else {
-                textViewDisplay.text = "${textViewDisplay.text}${buttonPressed.text}"
+                else if (it is ItemOperator){
+                    itemCalcs.add(ItemNumber(textPressed.toInt()))
+                }
+            }?:run{
+                itemCalcs.add(ItemNumber(textPressed.toInt()))
+            }
+        }else {
+            itemCalcs.lastOrNull()?.let{
+                if (it is ItemNumber){
+                    itemCalcs.add(ItemOperator(textPressed))
+                }
+
+                if (it is ItemOperator){
+                    it.value = textPressed
+                }
+            }
+        }
+
+        var display = ""
+        var result = 0
+        var index = 0
+        var lastOp : ItemOperator? = null
+        for(i in itemCalcs){
+            display += i.value
+            if (index == 0 ){
+                result = (i as ItemNumber).valueNumber!!
+                index ++
+                continue
+            }
+            if (index == 1){
+                lastOp = (i as ItemOperator)
+                index ++
+                continue
+            }
+            if (i is ItemNumber){
+                if( lastOp?.value == "+") result += i.valueNumber?:0
+                if( lastOp?.value == "-") result -= i.valueNumber?:0
+                if( lastOp?.value == "*") result *= i.valueNumber?:0
+                if( lastOp?.value == "/") result /= i.valueNumber?:0
+                index ++
+                continue
+            }
+            if (i is ItemOperator){
+                lastOp = (i as ItemOperator)
+                index ++
+                continue
             }
 
-        }else{
-            if (buttonPressed.text.equals(".")){
-                textViewDisplay.text = "0."
-            }else {
-                textViewDisplay.text = buttonPressed.text
-            }
-            userIsInTheMiddelOfIntroduction = true
         }
+
+        textViewDisplay.text = display
+        findViewById<TextView>(R.id.textViewResult).text = "$result"
 
     }
 }
